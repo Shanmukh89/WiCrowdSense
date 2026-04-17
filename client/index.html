@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiCrowdSense — Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            line-height: 1.5;
+        }
+
+        /* ── Nav ─────────────────────────────────── */
+        .nav {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-left { display: flex; align-items: center; gap: 10px; }
+        .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+        .nav-title { font-size: 15px; font-weight: 600; }
+        .nav-right { font-size: 12px; color: #94a3b8; }
+ 
+        /* ── Layout ──────────────────────────────── */
+        .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
+
+        /* ── Top stats row ────────────────────────── */
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .stat-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .stat-value { font-size: 28px; font-weight: 700; font-family: 'Consolas', 'SF Mono', monospace; }
+        .stat-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 10px;
+            border-radius: 12px;
+            margin-top: 4px;
+        }
+        .badge-empty    { background: #f0fdf4; color: #16a34a; }
+        .badge-low      { background: #f0fdf4; color: #16a34a; }
+        .badge-moderate { background: #fffbeb; color: #d97706; }
+        .badge-high     { background: #fff7ed; color: #ea580c; }
+        .badge-crowded  { background: #fef2f2; color: #dc2626; }
+
+        /* ── Charts (full width, stacked) ─────────── */
+        .chart-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .chart-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 10px; }
+        .chart-wrap { height: 160px; }
+
+        /* ── Links row ────────────────────────────── */
+        .links-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 10px; }
+        .links {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .link {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .link-name { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .link-val { font-size: 18px; font-weight: 700; font-family: 'Consolas', monospace; }
+        .link-unit { font-size: 10px; color: #94a3b8; }
+        .c-green  { color: #16a34a; }
+        .c-yellow { color: #d97706; }
+        .c-red    { color: #dc2626; }
+
+        /* ── Log ──────────────────────────────────── */
+        .log-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .log-header { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px; }
+        .log-list { max-height: 180px; overflow-y: auto; font-size: 12px; }
+        .log-list::-webkit-scrollbar { width: 4px; }
+        .log-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 8px; }
+        .log-time { color: #94a3b8; font-family: 'Consolas', monospace; min-width: 70px; }
+        .log-count { font-weight: 600; color: #1e293b; font-family: 'Consolas', monospace; }
+        .log-feat { color: #94a3b8; margin-left: auto; font-family: 'Consolas', monospace; }
+
+        @media (max-width: 640px) {
+            .stats { flex-direction: column; }
+            .links { flex-wrap: wrap; }
+            .link { min-width: calc(50% - 8px); }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-left">
+        <div class="nav-dot"></div>
+        <div class="nav-title">WiCrowdSense</div>
+    </div>
+    <div class="nav-right" id="nav-time">--:--:--</div>
+</nav>
+
+<div class="wrap">
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-label">People in Room</div>
+            <div class="stat-value" id="s-count">0</div>
+            <div class="badge badge-empty" id="s-badge">EMPTY</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg RSSI</div>
+            <div class="stat-value" id="s-rssi">--</div>
+            <div class="stat-sub">dBm</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Mean CSI</div>
+            <div class="stat-value" id="s-csi">--</div>
+            <div class="stat-sub">amplitude</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Entropy</div>
+            <div class="stat-value" id="s-ent">--</div>
+            <div class="stat-sub">spectral</div>
+        </div>
+    </div>
+
+    <!-- Charts stacked full-width -->
+    <div class="chart-section">
+        <div class="chart-title">People Count</div>
+        <div class="chart-wrap"><canvas id="c-people"></canvas></div>
+    </div>
+    <div class="chart-section">
+        <div class="chart-title">RSSI Signal (dBm)</div>
+        <div class="chart-wrap"><canvas id="c-rssi"></canvas></div>
+    </div>
+    <div class="chart-section">
+        <div class="chart-title">Mean CSI Amplitude</div>
+        <div class="chart-wrap"><canvas id="c-csi"></canvas></div>
+    </div>
+
+    <!-- Links -->
+    <div class="links-title">Link Activity</div>
+    <div class="links" id="links-row"></div>
+
+    <!-- Log -->
+    <div class="log-section">
+        <div class="log-header">Inference Log</div>
+        <div class="log-list" id="log-list"></div>
+    </div>
+
+</div>
+
+<script>
+// ── Live Update API ───────────────────────────────────────────────────
+// Call this function when real data arrives from the ML Backend / ESP32 network
+// aggregateData: { r: Number, c: Number, v: Number, e: Number, d: Number }
+// linkData: Array of objects { r: Number } representing RSSI for each link
+// predCount: Number, the crowd count estimated by the new trained ML model
+function updateDashboard(aggregateData, linkData, predCount) {
+    const t = new Date().toLocaleTimeString('en-US', { hour12: false });
+    
+    sCount.textContent = predCount;
+    const [dl, dc] = density(predCount);
+    sBadge.textContent = dl;
+    sBadge.className = 'badge ' + dc;
+    
+    sRssi.textContent = aggregateData.r.toFixed(1);
+    sCsi.textContent = aggregateData.c.toFixed(3);
+    sEnt.textContent = aggregateData.e.toFixed(2);
+    navTime.textContent = t;
+    
+    push(chP, t, predCount);
+    push(chR, t, aggregateData.r);
+    push(chC, t, aggregateData.c);
+    
+    // Update individual link cards if provided
+    if (linkData && linkData.length) {
+        linkData.forEach((l, i) => {
+            const el = document.getElementById('lv-' + i);
+            if (el) {
+                el.textContent = l.r.toFixed(1);
+                el.className = 'link-val ' + rssiCls(l.r);
+            }
+        });
+    }
+    
+    // Appending to inference log
+    const e = document.createElement('div');
+    e.className = 'log-entry';
+    e.innerHTML = `<span class="log-time">${t}</span><span class="log-count">${predCount} people</span><span class="log-feat">RSSI:${aggregateData.r.toFixed(1)} CSI:${aggregateData.c.toFixed(3)}</span>`;
+    logList.insertBefore(e, logList.firstChild);
+    if (logList.children.length > 40) logList.removeChild(logList.lastChild);
+}
+
+
+// Initial state reset
+sCount.textContent = "0";
+sBadge.textContent = "WAITING";
+sBadge.className = 'badge badge-empty';
+sRssi.textContent = "--";
+sCsi.textContent = "--";
+sEnt.textContent = "--";
+</script>
+    <script type="module" src="/src/vite-entry.ts"></script>
+</body>
+</html>
